@@ -1,0 +1,728 @@
+#+TITLE: Emacs Init
+#+AUTHOR: Jonathan Lai
+
+* Emacs Init as an Org file
+
+** My Emacs setup
+Lets make this organized and documented org-mode style
+
+** init-basics
+Here lets do the preliminary setup and put in some good defaults for emacs, including setting some system wide variables.
+
+#+BEGIN_SRC emacs-lisp
+;; https://emacs.stackexchange.com/questions/2286/what-can-i-do-to-speed-up-my-start-up
+(setq gc-cons-threshold 100000000)
+(add-hook 'emacs-startup-hook 'my/set-gc-threshold)
+(defun my/set-gc-threshold ()
+  "Reset `gc-cons-threshold' to its default value."
+  (setq gc-cons-threshold 800000))
+(setq straight-vc-git-default-protocol 'https)
+(setq straight-recipe-overrides '((nil . ((straight :type git
+                                                    :host github
+                                                    :repo "raxod502/straight.el"
+                                                    :branch "develop"
+                                                    :files ("straight.el"))))))
+;; https://github.com/raxod502/straight.el/issues/41
+;; https://github.com/tummychow/emacs referenced code
+(setq straight-check-for-modifications 'never)
+(let ((bootstrap-file (concat user-emacs-directory "straight/bootstrap.el"))
+      (bootstrap-version 2))
+  (unless (file-exists-p bootstrap-file)
+    (with-current-buffer
+        (url-retrieve-synchronously
+         "https://raw.githubusercontent.com/raxod502/straight.el/develop/install.el"
+         'silent 'inhibit-cookies)
+      (goto-char (point-max))
+      (eval-print-last-sexp)))
+  (load bootstrap-file nil 'nomessage))
+
+(straight-use-package 'use-package)
+
+(setq use-package-always-defer t)
+(setq use-package-always-ensure t)
+
+(setq dotemacs-cache-directory (concat user-emacs-directory ".cache/"))
+(setq no-littering-etc-directory
+      (expand-file-name "config/" dotemacs-cache-directory))
+(setq no-littering-var-directory
+      (expand-file-name "data/" dotemacs-cache-directory))
+(use-package no-littering
+  :demand t )
+(require 'recentf)
+(recentf-mode t)
+(setq recentf-max-menu-items 10)
+(setq recentf-save-file (concat no-littering-var-directory "recentf-save.el"))
+(add-to-list 'recentf-exclude no-littering-var-directory)
+(add-to-list 'recentf-exclude no-littering-etc-directory)
+(setq auto-save-file-name-transforms
+      `((".*" ,(no-littering-expand-var-file-name "auto-save/") t)))
+
+(let ((default-directory "~/.emacs.d/custom/"))
+  (normal-top-level-add-to-load-path '("."))
+  (normal-top-level-add-subdirs-to-load-path))
+
+(require 'dired-x)
+(require 'cross-platform-copy-paste)
+
+;; http://stackoverflow.com/questions/1480572/how-to-have-emacs-auto-refresh-all-buffers-when-files-have-changed-on-disk
+(global-auto-revert-mode t)
+
+(setq custom-file (concat user-emacs-directory "custom/custom.el"))
+
+;;(use-package esup)
+
+(use-package f
+  :demand t
+  :config
+  (unless (f-exists? dotemacs-cache-directory)
+    (f-mkdir dotemacs-cache-directory))
+  ;;(unless (f-exists? custom-file)
+  ;;  (f-touch custom-file))
+  )
+
+;; https://github.com/kiwanami/emacs-deferred
+(use-package deferred)
+
+(use-package undo-tree
+  :recipe (undo-tree :type git :host github :repo "emacsmirror/undo-tree")
+  :config
+  (global-undo-tree-mode t))
+
+;; Dont display logo at startup
+(setq inhibit-startup-message t)
+
+;; How do I change the scratch message in Emacs?
+;; http://stackoverflow.com/a/1498292/2741455
+(setq initial-scratch-message ";; This is the Emacs Scratch Buffer")
+
+(defalias 'yes-or-no-p 'y-or-n-p)
+
+;; Don't automatically add newline to end of file
+(setq mode-require-final-newline nil)
+
+(setq-default tab-width 2)
+(setq-default indent-tabs-mode nil) ;; seems to affect autocomplete modes
+
+(setq visible-bell 1)
+(menu-bar-mode -1)
+
+(require 'cl-lib)
+(eval-when-compile
+  (require 'cl))
+
+;; Closing all other buffers in Emacs
+;; http://stackoverflow.com/a/3417473/2741455
+(defun kill-other-buffers ()
+  "Kill all other buffers."
+  ;; http://emacs.stackexchange.com/questions/14509/kill-process-buffer-without-confirmation
+  ;; not used yet, but may be useful later
+  (interactive)
+  (setq kill-buffer-query-functions (delq 'process-kill-buffer-query-function kill-buffer-query-functions))
+  ;; http://stackoverflow.com/questions/3417438/closing-all-other-buffers-in-emacs
+  (mapc 'kill-buffer
+    (delq (current-buffer)
+      ;; https://stackoverflow.com/questions/5019724/in-emacs-what-does-this-error-mean-warning-cl-package-required-at-runtime
+      (cl-remove-if-not 'buffer-file-name (buffer-list))))
+  ;; http://emacs.stackexchange.com/questions/202/close-all-dired-buffers
+  (mapc (lambda (buffer)
+    (when (eq 'dired-mode (buffer-local-value 'major-mode buffer))
+      (kill-buffer buffer)))
+        (buffer-list))
+  (custom/kill-buffers "^\\*magit") ;; kill magit buffers
+  (custom/kill-buffers "^\\*grep") ;; kill projectile grep
+  (custom/kill-buffers "^\\*pt-search") ;; kill projectile pt
+  (custom/kill-buffers "^\\*ripgrep-search") ;; kill projectile ripgrep
+  (custom/kill-buffers "^\\*ag search text") ;; kill projectile ag
+)
+
+;; https://github.com/magit/magit/issues/2124
+(defun custom/kill-buffers (regexp)
+  "Kill buffers matching REGEXP without asking for confirmation."
+  (interactive "sKill buffers matching this regular expression: ")
+  (cl-letf (((symbol-function 'kill-buffer-ask)
+    (lambda (buffer) (kill-buffer buffer))))
+    (kill-matching-buffers regexp)))
+
+;; http://stackoverflow.com/questions/5052088/what-is-custom-set-variables-and-faces-in-my-emacs
+;; http://emacsblog.org/2008/12/06/quick-tip-detaching-the-custom-file/
+(load custom-file 'noerror)
+
+(setq tramp-default-method "ssh")
+;; https://github.com/syl20bnr/spacemacs/issues/192
+;; find-tag-noselect' got redefined...noise
+(setq ad-redefinition-action 'accept)
+
+(use-package restart-emacs)
+
+#+END_SRC
+
+** init-aesthetics
+Lets make emacs look and behave better.
+
+#+BEGIN_SRC emacs-lisp
+(line-number-mode t)
+(column-number-mode t)
+(global-linum-mode t)
+
+;; https://github.com/manute/emacs.d/blob/master/init.el
+(use-package smartparens
+  :init (smartparens-global-mode 1)
+  :diminish smartparens-mode)
+
+;; http://stackoverflow.com/questions/34531831/highlighting-trailing-whitespace-in-emacs-without-changing-character
+(setq-default show-trailing-whitespace t)
+(setq whitespace-style (quote (spaces tabs newline space-mark tab-mark newline-mark)))
+(setq whitespace-display-mappings
+  '((space-mark 32 [183] [46])
+    (tab-mark 9 [9655 9] [92 9])))
+(require 'whitespace)
+(defun whitespace-toggle-show-trailing-whitespace ()
+  "Toggle `show-trailing-whitespace'."
+  (interactive)
+  (setq show-trailing-whitespace (not show-trailing-whitespace)))
+
+(use-package spaceline
+  :demand t
+  :config
+  ;; https://github.com/TheBB/spaceline/issues/11
+  ;;https://alexschroeder.ch/geocities/kensanata/colors.html
+  (setq powerline-default-separator 'wave)
+  (set-face-background 'spaceline-evil-normal "dark salmon")
+  (set-face-background 'spaceline-evil-insert "dark salmon")
+  (set-face-background 'spaceline-evil-visual "DarkGoldenrod2")
+  (setq spaceline-highlight-face-func 'spaceline-highlight-face-evil-state)
+  (require 'spaceline-config)
+  (spaceline-spacemacs-theme))
+
+;; https://github.com/domtronn/spaceline-all-the-icons.el/issues/45
+(use-package fancy-battery
+  :recipe (fancy-battery :type git :host github :repo "emacsmirror/fancy-battery")
+  :init
+  (fancy-battery-mode)
+  :config
+  (setq-default battery-update-interval 30)
+  (set-face-attribute 'fancy-battery-charging nil
+  :foreground "dark salmon" :weight 'bold)
+  (set-face-attribute 'fancy-battery-discharging nil
+  :foreground "dark salmon" :weight 'bold)
+  (set-face-attribute 'fancy-battery-critical nil
+  :foreground "dark salmon" :weight 'bold))
+
+;;(use-package ethan-wspace)
+
+(use-package apropospriate-theme
+  :disabled
+  :init
+  (load-theme 'apropospriate-dark t))
+
+(use-package spacemacs-theme
+  :disabled
+  :init
+  (load-theme 'spacemacs-dark t))
+
+(use-package atom-dark-theme
+  :disabled)
+
+(use-package zenburn-theme
+  :disabled
+  :init
+  (load-theme 'zenburn t))
+
+(use-package seoul256-theme
+  :recipe (seoul256-emacs :type git :host github :repo "agsdot/seoul256-emacs"
+                          :upstream (:host github :repo "anandpiyer/seoul256-emacs"))
+  :init
+  (setq seoul256-background 235)
+  (load-theme 'seoul256 t))
+
+(use-package monokai-theme
+  :disabled
+  :init
+  (load-theme 'monokai t))
+
+(use-package ample-theme
+  :disabled
+  :init
+  (load-theme 'ample t t)
+  (load-theme 'ample-flat t t)
+  (load-theme 'ample-light t t)
+  (enable-theme 'ample-flat))
+
+(use-package monokai-theme
+  :disabled
+  :init
+   (load-theme 'monokai t))
+
+(use-package base16
+  :disabled
+  :init
+  (load-theme 'base16-eighties t))
+
+#+END_SRC
+
+** init-navigation
+Gotta navigate around emacs more efficiently, and this is how.
+
+#+BEGIN_SRC emacs-lisp
+(use-package general
+  :demand t
+  :config
+  ;; https://github.com/auwsmit/emacsconfig/blob/03236e22b1a2b16b2423ead503591a4302b8f7bd/
+  ;; config.org#compatibility-with-other-modes
+  (general-define-key
+   :keymaps 'ivy-minibuffer-map
+   "C-j" 'ivy-next-line
+   "C-k" 'ivy-previous-line
+   "C-n" 'ivy-next-history-element
+   "C-p" 'ivy-previous-history-element
+   "<C-return>" 'ivy-immediate-done
+   "C-l" 'ivy-immediate-done
+   "C-w" 'ivy-backward-kill-word)
+
+  (general-define-key
+    :states '(normal motion emacs)
+    :prefix ","
+    "/"  'evilnc-comment-or-uncomment-lines
+    "f"  'my-search-util
+    "nd" 'dired-sidebar-toggle-sidebar
+    "nf" 'neotree-find
+    "nt" 'neotree-toggle)
+
+  (general-define-key
+    :states '(normal motion emacs)
+    :prefix "<SPC>"
+    "aj"     'ace-jump-mode
+    "av"     'avy-goto-char
+    "b"      'ivy-switch-buffer
+    "e"      'eval-region
+    "fs"     'evil-write
+    "j"      'prettier
+    "l"      'linum-relative-toggle
+    "k"      'kill-other-buffers
+    "pp"     'projectile-find-file
+    "pf"     'counsel-fzf
+    "r"      'counsel-recentf
+
+    "qa"     'evil-quit-all
+    "qs"     'evil-save-and-close
+    "qq"     'evil-quit
+
+    "wa"     'evil-write-all
+    "ww"     'evil-write
+    "wq"     'evil-save-and-close
+
+    "<down>" 'drag-stuff-down
+    "<up>"   'drag-stuff-up
+    "TAB"    'org-cycle
+    ";"      'counsel-M-x
+    "/"      'evilnc-comment-or-uncomment-lines
+    ))
+
+;; http://emacs.stackexchange.com/questions/17710/use-package-with-config-to-set-variables
+(use-package smex :demand t)
+
+(use-package swiper)
+(use-package counsel)
+(use-package ivy
+  :config
+  (ivy-mode 1)
+  ;; https://github.com/abo-abo/swiper/issues/164
+  (define-key
+    ivy-switch-buffer-map
+    (kbd "C-e")
+    (lambda ()
+      (interactive)
+      (ivy-set-action 'kill-buffer)
+      (ivy-done)))
+  (global-set-key (kbd "M-x") 'counsel-M-x) ;; when in Emacs keybindings
+  (setq ivy-height 14) ;; number of result lines to display
+  ;; (setq ivy-initial-inputs-alist nil) ;; no regexp by default
+  (setq ivy-re-builders-alist
+    '((t . ivy--regex-fuzzy))))
+
+;; https://github.com/krobertson/emacs.d/blob/master/packages.el
+(use-package projectile
+  :config
+  (projectile-mode 1)
+  ;;https://github.com/lunaryorn/.emacs.d/blob/master/init.el
+  ;;(validate-setq projectile-completion-system 'ivy
+  ;;  projectile-find-dir-includes-top-level t)
+  (setq projectile-completion-system 'ivy)
+  :init
+  (setq projectile-require-project-root nil))
+
+(use-package fzf)
+
+(use-package counsel-projectile
+  :config
+  (counsel-projectile-on))
+
+(use-package dired-sidebar)
+(use-package dired-subtree
+  :config
+  (setq dired-subtree-line-prefix "_ ")
+  (setq dired-subtree-use-backgrounds nil))
+(use-package ace-window)
+
+(use-package neotree
+  :demand t
+  :config
+  (setq-default neo-show-hidden-files t)
+  ;; from https://github.com/kaushalmodi/.emacs.d/blob/master/setup-files/setup-neotree.el
+  (setq neo-theme 'nerd) ; 'classic, 'nerd, 'ascii, 'arrow
+  (setq neo-vc-integration '(face char))
+  ;; Patch to fix vc integration
+  (defun neo-vc-for-node (node)
+    (let* ((backend (vc-backend node))
+           (vc-state (when backend (vc-state node backend))))
+      ;; (message "%s %s %s" node backend vc-state)
+      (cons (cdr (assoc vc-state neo-vc-state-char-alist))
+            (cl-case vc-state
+              (up-to-date       neo-vc-up-to-date-face)
+              (edited           neo-vc-edited-face)
+              (needs-update     neo-vc-needs-update-face)
+              (needs-merge      neo-vc-needs-merge-face)
+              (unlocked-changes neo-vc-unlocked-changes-face)
+              (added            neo-vc-added-face)
+              (removed          neo-vc-removed-face)
+              (conflict         neo-vc-conflict-face)
+              (missing          neo-vc-missing-face)
+              (ignored          neo-vc-ignored-face)
+              (unregistered     neo-vc-unregistered-face)
+              (user             neo-vc-user-face)
+              (t                neo-vc-default-face)))))
+  ;; from https://github.com/kaushalmodi/.emacs.d/blob/master/setup-files/setup-neotree.el
+
+  ;; from https://github.com/andrewmcveigh/emacs.d
+  ;; get keybindings to work better in neotree with evil
+  (defun neotree-copy-file ()
+    (interactive)
+    (let* ((current-path (neo-buffer--get-filename-current-line))
+           (msg (format "Copy [%s] to: "
+                        (neo-path--file-short-name current-path)))
+           (to-path (read-file-name msg (file-name-directory current-path))))
+      (dired-copy-file current-path to-path t))
+    (neo-buffer--refresh t))
+  )
+
+;;(use-package dashboard
+;;  :demand t
+;;  :config
+;;  (setq show-trailing-whitespace nil)
+;;  (dashboard-setup-startup-hook)
+;;  (setq dashboard-items '((recents  . 15)
+;;                          (projects . 5))))
+
+(use-package ace-jump-mode)
+(use-package avy)
+
+(require 'saveplace)
+(setq-default save-place t)
+(setq save-place-forget-unreadable-files nil)
+;; Try to make emacsclient play nice with saveplace
+;; http://www.emacswiki.org/emacs/EmacsClient#toc35
+(setq server-visit-hook (quote (save-place-find-file-hook)))
+#+END_SRC
+
+** init-evil
+Lets add the awesome vim/modal editing keybindings. So much more fluid to edit with than emacs own.
+
+#+BEGIN_SRC emacs-lisp
+(use-package goto-chg)
+;; evil mode setup ;;
+(setq evil-want-C-w-in-emacs-state t)
+(setq evil-default-cursor t)
+(use-package evil
+  :demand t
+  :config
+  (evil-mode 1)
+  ;; https://stackoverflow.com/questions/14302171/ctrl-u-in-emacs-when-using-evil-key-bindings
+  (define-key evil-normal-state-map (kbd "C-u") 'evil-scroll-up)
+  (define-key evil-visual-state-map (kbd "C-u") 'evil-scroll-up)
+  (define-key evil-normal-state-map ";" 'evil-ex)
+  (define-key evil-normal-state-map ":" 'counsel-M-x)
+
+  ;; for use in counsel-M-x / smex
+  (defalias 'w 'evil-write)
+  (defalias 'wq 'evil-save-and-close)
+  (defalias 'wq! 'evil-save-and-close)
+  (defalias 'q 'evil-quit)
+  (defalias 'q! 'evil-quit)
+  (defalias 'gst 'magit-status)
+  (defalias 'st 'magit-status)
+
+  ;;(evil-set-initial-state 'magit-status-mode 'emacs)
+  ;;(evil-set-initial-state 'magit-log-edit-mode 'emacs)
+  ;;(evil-set-initial-state 'dashboard-mode 'emacs)
+
+  (define-key evil-normal-state-map (kbd "C-<down>") 'drag-stuff-down)
+  (define-key evil-normal-state-map (kbd "C-<up>") 'drag-stuff-up)
+
+  (define-key evil-motion-state-map "j" 'evil-next-visual-line)
+  (define-key evil-motion-state-map "k" 'evil-previous-visual-line)
+
+  ;; https://stackoverflow.com/questions/20882935/how-to-move-between-visual-lines-and-move-past-newline-in-evil-mode
+  ;; Make horizontal movement cross lines
+  (setq-default evil-cross-lines t)
+
+  (define-key evil-normal-state-map (kbd "C-w ]") 'evil-window-rotate-downwards)
+  (define-key evil-normal-state-map (kbd "C-w [") 'evil-window-rotate-upwards)
+
+  (define-key evil-normal-state-map (kbd "C-h")   'evil-window-left)
+  (define-key evil-normal-state-map (kbd "C-j")   'evil-window-down)
+  (define-key evil-normal-state-map (kbd "C-k")   'evil-window-up)
+  (define-key evil-normal-state-map (kbd "C-l")   'evil-window-right)
+
+  (evil-ex-define-cmd "Q"  'evil-quit)
+  (evil-ex-define-cmd "Qa" 'evil-quit-all)
+  (evil-ex-define-cmd "QA" 'evil-quit-all)
+
+  ;; setup extra keybindings ;;
+  ;; Bind DEL and = keys to scrolling up and down
+  ;; https://stackoverflow.com/questions/8483182/evil-mode-best-practice
+  (define-key evil-normal-state-map (kbd "DEL") (lambda ()
+    (interactive)
+    (previous-line 10)
+    (evil-scroll-line-up 10)))
+
+  (define-key evil-normal-state-map (kbd "=") (lambda ()
+    (interactive)
+    (next-line 10)
+    (evil-scroll-line-down 10)))
+
+  (define-minor-mode neotree-evil
+    "Use NERDTree bindings on neotree."
+    :lighter " NT"
+    :keymap (progn
+              (evil-make-overriding-map neotree-mode-map 'normal t)
+              (evil-define-key 'normal neotree-mode-map
+                "C" 'neotree-change-root
+                "U" 'neotree-select-up-node
+                "r" 'neotree-refresh
+                "o" 'neotree-enter
+                (kbd "<return>") 'neotree-enter
+                "i" 'neotree-enter-horizontal-split
+                "s" 'neotree-enter-vertical-split
+                "n" 'evil-search-next
+                "N" 'evil-search-previous
+                "ma" 'neotree-create-node
+                "mc" 'neotree-copy-file
+                "md" 'neotree-delete-node
+                "mm" 'neotree-rename-node
+                "gg" 'evil-goto-first-line)
+              neotree-mode-map)))
+;;(use-package evil-collection
+;;  :recipe (evil-collection :type git :host github :repo "jojojames/evil-collection")
+;;  ;;:ensure nil
+;;  ;;:after evil
+;;  :config
+;;  (evil-collection-init))
+
+(use-package evil-escape
+  :config
+  (evil-escape-mode)
+  (setq-default evil-escape-key-sequence "kj"))
+
+(use-package evil-matchit
+  :config
+  (global-evil-matchit-mode 1))
+
+(use-package evil-surround
+  :config
+  (global-evil-surround-mode 1))
+
+(use-package evil-visualstar
+  :config
+  (global-evil-visualstar-mode))
+
+(use-package evil-numbers
+  :config
+  (define-key evil-normal-state-map (kbd "C-<right>") 'evil-numbers/inc-at-pt)
+  (define-key evil-normal-state-map (kbd "C-<left>") 'evil-numbers/dec-at-pt))
+
+;; https://github.com/skeeto/.emacs.d/blob/master/init.el
+(use-package evil-smartparens
+  :init
+  (add-hook 'smartparens-enabled-hook #'evil-smartparens-mode))
+
+(use-package evil-expat
+  :recipe (evil-expat :type git :host github :repo "edkolev/evil-expat")
+  :defer 1)
+
+#+END_SRC
+
+** init-coding
+Here we're going to make emacs a great coding environment.
+
+#+BEGIN_SRC emacs-lisp
+;; enable seeing of git diffs
+;; got git-gutter working properly with use-package
+;; https://github.com/hlissner/emacs.d/blob/master/init/init-git.el
+(use-package git-gutter
+  :demand t
+  :diminish git-gutter-mode
+  :config
+  (global-git-gutter-mode 1))
+
+(use-package git-timemachine)
+
+(use-package magit
+  :config
+  ;; http://whattheemacsd.com/setup-magit.el-01.html
+  ;; http://www.lunaryorn.com/posts/fullscreen-magit-status.html
+  (magit-auto-revert-mode 0) ;; magit auto revert mode seemed to take some time on startup
+  (defadvice magit-status (around magit-fullscreen activate)
+    (window-configuration-to-register :magit-fullscreen)
+    ad-do-it
+    (delete-other-windows))
+  (defun magit-quit-session ()
+    "Restores the previous window configuration and kills the magit buffer"
+    (interactive)
+    (kill-buffer)
+    (jump-to-register :magit-fullscreen)))
+(use-package magit-rockstar)
+(use-package evil-magit
+  :after magit
+  ;; http://cachestocaches.com/2016/12/vim-within-emacs-anecdotal-guide/
+  ;; https://github.com/gjstein/emacs.d/blob/cb126260d30246dc832d6e456b06676f517b35b0/config/init-40-coding-gen.el#L90-L111
+  :config
+  ;; Default commit editor opening in insert mode
+  (add-hook 'with-editor-mode-hook 'evil-insert-state)
+  ;; (evil-define-key 'normal with-editor-mode-map
+  ;;   (kbd "RET") 'with-editor-finish
+  ;;   [escape] 'with-editor-cancel)
+  ;; (evil-define-key 'normal git-rebase-mode-map
+  ;;   "l" 'git-rebase-show-commit)
+  )
+
+(use-package evil-nerd-commenter
+  :commands (evilnc-comment-or-uncomment-lines)
+  :config
+  (evilnc-default-hotkeys))
+
+(use-package editorconfig
+  :config
+  (editorconfig-mode 1))
+
+(use-package php-mode
+  :config
+  (add-to-list 'auto-mode-alist '("\\.php?\\'" . php-mode))
+  ;; for drupal file editing
+  (add-to-list 'auto-mode-alist '("\\.inc?\\'" . php-mode))
+  (add-to-list 'auto-mode-alist '("\\.module?\\'" . php-mode)))
+
+(use-package web-mode
+  :config
+  ;; (add-to-list 'auto-mode-alist '("\\.jsx?\\'" . web-mode))
+  (add-to-list 'auto-mode-alist '("\\.html?\\'" . web-mode))
+  (add-to-list 'auto-mode-alist '("\\.gsp?\\'" . web-mode)))
+
+;; https://github.com/yasuyk/web-beautify
+;; js-beautify installed by typing: npm -g install js-beautify
+;; beautify js AND html AND css
+(when (executable-find "js-beautify")
+  (use-package web-beautify))
+
+;; https://github.com/redguardtoo/emacs.d/blob/master/lisp/init-javascript.el
+;; this setup seems to make *.js files always load in js2-mode, previous way had some issues
+(use-package js2-mode)
+(setq auto-mode-alist (cons '("\\.js?\\'" . js2-mode) auto-mode-alist))
+(setq auto-mode-alist (cons '("\\.jsx?\\'" . js2-mode) auto-mode-alist))
+(setq auto-mode-alist (cons '("\\.json?\\'" . js2-mode) auto-mode-alist))
+
+;;http://stackoverflow.com/questions/28017629/how-do-i-set-indent-to-2-spaces-in-js2-mode
+(add-hook 'js2-mode-hook
+  (lambda () (setq js2-basic-offset 2)))
+
+;; prettier installed by typing: npm -g install prettier
+;;(when (executable-find "prettier")
+;;  (use-package prettier-js)
+;;  (setq prettier-js-width-mode nil)
+;;  (setq prettier-js-args '("--single-quote" "--bracket-spacing"))
+;;  (add-hook 'js-mode-hook 'prettier-js-mode)
+;;  (add-hook 'js2-mode-hook 'prettier-js-mode)
+;;  ;; https://superuser.com/questions/684352/add-keybinding-to-js-mode-javascript-mode-in-emacs
+;;  ;; js-mode loads js.el file, so eval-after-load 'js to bind to js-mode-map
+;;  (eval-after-load 'js
+;;    '(define-key js-mode-map (kbd "C-c j") 'prettier-js))
+;;  (eval-after-load 'js2-mode
+;;    '(define-key js2-mode-map (kbd "C-c j") 'prettier-js)))
+
+(use-package pug-mode
+  :config
+  (add-to-list 'auto-mode-alist '("\\.jade?\\'" . pug-mode))
+  (add-to-list 'auto-mode-alist '("\\.pug?\\'" . pug-mode)))
+
+;; https://github.com/jcf/emacs.d/blob/master/init-languages.org
+(require 'css-mode)
+(setq css-indent-offset 2)
+
+(use-package rainbow-mode
+  :init
+  (dolist (hook '(css-mode-hook html-mode-hook))
+    (add-hook hook 'rainbow-mode)))
+
+(use-package groovy-mode
+  :config
+  (autoload 'groovy-mode "groovy-mode" "Major mode for editing Groovy code." t)
+  (add-to-list 'auto-mode-alist '("\.groovy$" . groovy-mode))
+  (add-to-list 'auto-mode-alist '("\.gradle$" . groovy-mode))
+  (add-to-list 'interpreter-mode-alist '("groovy" . groovy-mode)))
+
+(use-package go-mode
+  :config
+  (autoload 'go-mode "go-mode" "Major mode for editing Go code." t)
+  (add-to-list 'auto-mode-alist '("\\.go?\\'" . go-mode)))
+
+(use-package lua-mode
+  :config
+  (add-to-list 'auto-mode-alist '("\\.lua?\\'" . lua-mode)))
+
+(use-package vimrc-mode
+  :config
+  (add-to-list 'auto-mode-alist '(".vim\\(rc\\)?$" . vimrc-mode)))
+
+(use-package drag-stuff
+  :config
+  (drag-stuff-global-mode t))
+
+;; http://stackoverflow.com/a/15310340/2741455
+;; How to set defcustom variable
+(use-package linum-relative
+  :config
+  (setq linum-relative-format "%3s ")
+  (setq linum-relative-current-symbol ""))
+
+(use-package ripgrep)            ;; https://github.com/nlamirault/ripgrep.el
+(use-package projectile-ripgrep) ;; https://github.com/nlamirault/ripgrep.el
+(use-package pt)                 ;; https://github.com/bling/pt.el
+(use-package ag)                 ;; https://github.com/Wilfred/ag.el
+;;(use-package rg)                 ;; https://github.com/dajva/rg.el
+
+(cond ((executable-find "rg")
+        (defalias 'my-search-util 'projectile-ripgrep))  ;; Have heard good things about this Rust based search utility
+      ((executable-find "pt")
+        (defalias 'my-search-util 'projectile-pt))  ;; seems pretty fast (faster than ag? maybe...dunno), but it's written in Go!
+      ((executable-find "ag")
+        (defalias 'my-search-util 'projectile-ag))  ;; on the website, it said faster than ack
+      ((executable-find "grep")
+        (defalias 'my-search-util 'projectile-grep)))
+
+;; https://www.reddit.com/r/emacs/comments/6ddr7p/snippet_search_cheatsh_using_ivy/
+(defun ejmr-search-cheat-sh ()
+  "Search `http://cheat.sh/' for help on commands and code."
+  (interactive)
+  (ivy-read "Command or Topic: "
+      (process-lines "curl" "--silent" "http://cheat.sh/:list?T&q")
+      :require-match t
+      :sort t
+      :history 'ejmr-search-cheat-sh
+      :action (lambda (input)
+        (browse-url (concat "http://cheat.sh/" input "?T&q")))
+      :caller 'ejmr-search-cheat-sh))
+#+END_SRC
+** init-last-minute-touches
+Here are some last minute touches.
+#+BEGIN_SRC emacs-lisp
+
+#+END_SRC
