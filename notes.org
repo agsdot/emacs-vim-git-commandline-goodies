@@ -3,13 +3,22 @@
 
 * Emacs Init as an Org file
 
-** My Emacs setup
-Lets make this organized and documented org-mode style
+** Introduction
+Jonathan Lai
+@jonlai
+jonathanlai@stanford.edu
 
-** init-basics
-Here lets do the preliminary setup and put in some good defaults for emacs, including setting some system wide variables.
+Stanford Graduate School of Education IT (gseit.stanford.edu) at the CERAS building near Green Library and the Law School
 
-lorem ipsum
+Background: Biology, Education, Tech
+
+Very much into tech for the open source / academic / sharing ethos.
+
+** Interest in Command Line tools background
+What's your background in working with the terminal.
+Console / Bash, git, emacs, vim?
+
+What do you want to get out of this session
 
 ** init-aesthetics
 Lets make emacs look and behave better.
