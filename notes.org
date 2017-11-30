@@ -113,3 +113,15 @@ Feel free to followup via email / twitter / github / slack etc
 
 Good vim plugins
 syntastic, nerdtree, devops files syntax correction (a concern)
+
+Other links presented in Q and A
+
+https://github.com/PotatoLabs/git-redate
+https://github.com/alebcay/awesome-shell
+
+https://github.com/flycheck/flycheck
+https://github.com/voxpupuli/puppet-mode
+
+https://github.com/vim-syntastic/syntastic
+
+http://ix.io/CFN
