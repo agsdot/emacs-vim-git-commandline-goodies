@@ -86,6 +86,11 @@ Here are some last minute touches.
 
 ** Other / Misc
 
+Org mode - what I used for this presentation
+
+More plugins and emacs tools in my emacs config on github
+https://github.com/agsdot/.emacs.d
+
 Pandoc, org to markdown to others
 
 ix.io
@@ -97,3 +102,5 @@ I'll post and share these notes.
 
 ** Questions and Answers
 10:45 and onwards
+
+Feel free to followup via email / twitter / github / slack etc
