@@ -1,11 +1,7 @@
 #+TITLE: Emacs Vim Git -- Command Line Git Goodies
 #+AUTHOR: Jonathan Lai
 
-* Session Talk 10:15 - 11:00
-
-** Introduction
-If one thing you learn in this session, take note of this website
-http://awesome.re
+* Session
 
 Jonathan Lai
 @jonlai
@@ -24,11 +20,19 @@ Console / Bash, git, emacs, vim?
 
 emacs, vim, git
 
-what do you already know about them.
+- what do you already know about them.
 
-what topics would you like covered.
+- what topics would you like covered.
+  - how are others using emacs
+  - other applications of emacs
+  - best features we haven't heard of
+  - tricks and tips
+    - plugins
+    - screencasts
+    - neovim
 
 What do you want to get out of this session
+  - education of the editors
 
 ** awesome website resources
 
@@ -48,7 +52,9 @@ I can share this internal page later
 
 ** emacs and vim with git tools
 Magit - emacs
+
 Fugitive - vim
+http://vimcasts.org/episodes/fugitive-vim---a-complement-to-command-line-git/
 
 Other various plugins for them both. The awesome websites link to a lot of resources.
 
@@ -69,15 +75,15 @@ git log viewage, beautify git log
 
 Gotta navigate around emacs more efficiently, and this is how.
 
-** Other cool command line tools with text editor integration 
+** Other cool command line tools with text editor integration
 
 fzf
+https://github.com/junegunn/fzf
 
 ag (like grep but faster)
+https://github.com/ggreer/the_silver_searcherk
 
 ** More vim and emacs goodness
-
-cat file.txt | vi -
 
 g blame file.txt
 
@@ -104,3 +110,6 @@ I'll post and share these notes.
 10:45 and onwards
 
 Feel free to followup via email / twitter / github / slack etc
+
+Good vim plugins
+syntastic, nerdtree, devops files syntax correction (a concern)
